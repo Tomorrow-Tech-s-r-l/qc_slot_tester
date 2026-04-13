@@ -1,98 +1,182 @@
+import threading
+import time
+
 import customtkinter as ctk
 import serial
 import serial.tools.list_ports
-import time # Imported time to handle the Arduino reset delay
+
 
 class GridSerialApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("2x2 Control Grid")
-        self.geometry("500x450") # Made slightly taller to fit the connect button
+        self.title("TestBoard Control")
+        self.geometry("500x520")
+        self.resizable(False, False)
 
-        self.serial_conn = None # Variable to store the persistent connection
+        self.serial_conn = None
 
-        # Configure the grid system (2 columns, equal weight)
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        # Configure grid
         self.grid_columnconfigure((0, 1), weight=1)
         self.grid_rowconfigure((1, 2), weight=1)
 
-        # --- Header ---
+        # Header
         self.label = ctk.CTkLabel(self, text="Hardware Control Pad", font=("Arial", 22, "bold"))
         self.label.grid(row=0, column=0, columnspan=2, pady=20)
 
-        # --- Row 1: The Main Controls ---
-        self.on_btn = ctk.CTkButton(self, text="Led ON", fg_color="#2ecc71", # Green
-                                    command=lambda: self.send_command("LED_ON"))
+        # Row 1: LED controls
+        self.on_btn = ctk.CTkButton(
+            self, text="LED ON", fg_color="#2ecc71", hover_color="#27ae60",
+            command=lambda: self.send_command("LED_ON"), state="disabled"
+        )
         self.on_btn.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
 
-        self.off_btn = ctk.CTkButton(self, text="Led OFF", fg_color="#e74c3c", # Red
-                                     command=lambda: self.send_command("LED_OFF"))
+        self.off_btn = ctk.CTkButton(
+            self, text="LED OFF", fg_color="#e74c3c", hover_color="#c0392b",
+            command=lambda: self.send_command("LED_OFF"), state="disabled"
+        )
         self.off_btn.grid(row=1, column=1, padx=20, pady=10, sticky="nsew")
 
-        # --- Row 2: Generic / Extra Buttons ---
-        self.gen1_btn = ctk.CTkButton(self, text="Lock ON", fg_color="#2ecc71", # Green
-                                      command=lambda: self.send_command("Lock_ON"))
-        self.gen1_btn.grid(row=2, column=0, padx=20, pady=10, sticky="nsew")
+        # Row 2: Lock controls
+        self.lock_on_btn = ctk.CTkButton(
+            self, text="Lock ON", fg_color="#2ecc71", hover_color="#27ae60",
+            command=lambda: self.send_command("Lock_ON"), state="disabled"
+        )
+        self.lock_on_btn.grid(row=2, column=0, padx=20, pady=10, sticky="nsew")
 
-        # FIXED: Removed the extra \n from the command string here
-        self.gen2_btn = ctk.CTkButton(self, text="Lock OFF", fg_color="#e74c3c", # Red
-                                      command=lambda: self.send_command("Lock_OFF"))
-        self.gen2_btn.grid(row=2, column=1, padx=20, pady=10, sticky="nsew")
+        self.lock_off_btn = ctk.CTkButton(
+            self, text="Lock OFF", fg_color="#e74c3c", hover_color="#c0392b",
+            command=lambda: self.send_command("Lock_OFF"), state="disabled"
+        )
+        self.lock_off_btn.grid(row=2, column=1, padx=20, pady=10, sticky="nsew")
 
-        # --- Row 3: Port Selection & Connect Button ---
+        # Row 3: Port dropdown + connect/disconnect
         self.port_var = ctk.StringVar(value="Select Port")
-        self.port_menu = ctk.CTkOptionMenu(self, variable=self.port_var, values=self.get_ports())
-        self.port_menu.grid(row=3, column=0, padx=20, pady=10)
+        self.port_menu = ctk.CTkOptionMenu(self, variable=self.port_var, values=self._get_ports())
+        self.port_menu.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
 
-        self.connect_btn = ctk.CTkButton(self, text="Connect", command=self.connect_serial)
-        self.connect_btn.grid(row=3, column=1, padx=20, pady=10)
+        self.connect_btn = ctk.CTkButton(self, text="Connect", command=self._toggle_connection)
+        self.connect_btn.grid(row=3, column=1, padx=20, pady=10, sticky="ew")
 
-        # --- Row 4: Status Label ---
+        # Row 4: Refresh ports button
+        self.refresh_btn = ctk.CTkButton(
+            self, text="Refresh Ports", fg_color="gray40", hover_color="gray30",
+            command=self._refresh_ports
+        )
+        self.refresh_btn.grid(row=4, column=0, columnspan=2, padx=20, pady=5, sticky="ew")
+
+        # Row 5: Status label
         self.status_label = ctk.CTkLabel(self, text="Status: Disconnected", text_color="gray")
-        self.status_label.grid(row=4, column=0, columnspan=2, pady=10)
+        self.status_label.grid(row=5, column=0, columnspan=2, pady=10)
 
-    def get_ports(self):
-        ports = [port.device for port in serial.tools.list_ports.comports()]
+    # --- Port helpers ---
+
+    def _get_ports(self):
+        ports = [p.device for p in serial.tools.list_ports.comports()]
         return ports if ports else ["No Ports Found"]
 
-    def connect_serial(self):
+    def _refresh_ports(self):
+        ports = self._get_ports()
+        self.port_menu.configure(values=ports)
+        current = self.port_var.get()
+        if current not in ports:
+            self.port_var.set(ports[0])
+
+    # --- Connection management ---
+
+    def _set_controls_state(self, state):
+        for btn in (self.on_btn, self.off_btn, self.lock_on_btn, self.lock_off_btn):
+            btn.configure(state=state)
+
+    def _toggle_connection(self):
+        if self.serial_conn and self.serial_conn.is_open:
+            self._disconnect()
+        else:
+            self._start_connect()
+
+    def _disconnect(self):
+        if self.serial_conn:
+            try:
+                self.serial_conn.close()
+            except Exception:
+                pass
+            self.serial_conn = None
+        self._set_controls_state("disabled")
+        self.connect_btn.configure(text="Connect", state="normal")
+        self.refresh_btn.configure(state="normal")
+        self.status_label.configure(text="Status: Disconnected", text_color="gray")
+
+    def _start_connect(self):
         port = self.port_var.get()
-        if port in ["Select Port", "No Ports Found"]:
-            self.status_label.configure(text="Error: Select Port First", text_color="red")
+        if port in ("Select Port", "No Ports Found"):
+            self.status_label.configure(text="Error: Select a port first", text_color="red")
             return
 
-        # Close any existing connection before opening a new one
         if self.serial_conn and self.serial_conn.is_open:
             self.serial_conn.close()
-
-        try:
-            self.status_label.configure(text="Connecting (Waiting for reset)...", text_color="orange")
-            self.update() # Force UI to update text immediately
-
-            # Open the persistent connection
-            self.serial_conn = serial.Serial(port, 9600, timeout=1)
-            
-            # IMPORTANT: Wait 2 seconds for Arduino to finish booting up
-            time.sleep(2) 
-
-            self.status_label.configure(text=f"Connected: {port}", text_color="green")
-        except Exception as e:
-            self.status_label.configure(text="Port Error: Could not connect", text_color="red")
             self.serial_conn = None
 
+        # Disable buttons while connecting to prevent double-clicks
+        self.connect_btn.configure(state="disabled")
+        self.refresh_btn.configure(state="disabled")
+        self.status_label.configure(text="Connecting — waiting for Arduino reset...", text_color="orange")
+        self.update()
+
+        # Run blocking connect in a background thread so the UI stays responsive
+        threading.Thread(target=self._connect_worker, args=(port,), daemon=True).start()
+
+    def _connect_worker(self, port):
+        try:
+            conn = serial.Serial(port, 9600, timeout=1)
+            time.sleep(2)  # Wait for Arduino boot
+            self.after(0, self._on_connect_success, conn, port)
+        except serial.SerialException as e:
+            self.after(0, self._on_connect_failure, str(e))
+        except Exception as e:
+            self.after(0, self._on_connect_failure, str(e))
+
+    def _on_connect_success(self, conn, port):
+        self.serial_conn = conn
+        self._set_controls_state("normal")
+        self.connect_btn.configure(text="Disconnect", state="normal")
+        self.refresh_btn.configure(state="normal")
+        self.status_label.configure(text=f"Connected: {port}", text_color="green")
+
+    def _on_connect_failure(self, error_msg):
+        self.serial_conn = None
+        self.connect_btn.configure(text="Connect", state="normal")
+        self.refresh_btn.configure(state="normal")
+        self.status_label.configure(text=f"Error: {error_msg}", text_color="red")
+
+    # --- Command sending ---
+
     def send_command(self, cmd):
-        # Check if we have an active, open connection first
         if not self.serial_conn or not self.serial_conn.is_open:
-            self.status_label.configure(text="Error: Click Connect First!", text_color="red")
+            self.status_label.configure(text="Error: Not connected", text_color="red")
+            self._set_controls_state("disabled")
+            self.connect_btn.configure(text="Connect")
             return
 
         try:
-            # We add the \n right here, so your Arduino can read it
-            self.serial_conn.write(f"{cmd}\n".encode('utf-8'))
+            self.serial_conn.write(f"{cmd}\n".encode("utf-8"))
             self.status_label.configure(text=f"Sent: {cmd}", text_color="green")
-        except Exception as e:
-            self.status_label.configure(text="Send Error (Disconnected?)", text_color="red")
+        except serial.SerialException as e:
+            self.status_label.configure(text=f"Send error: {e}", text_color="red")
             self.serial_conn = None
+            self._set_controls_state("disabled")
+            self.connect_btn.configure(text="Connect")
+        except Exception as e:
+            self.status_label.configure(text=f"Unexpected error: {e}", text_color="red")
+
+    # --- Cleanup ---
+
+    def _on_close(self):
+        if self.serial_conn and self.serial_conn.is_open:
+            self.serial_conn.close()
+        self.destroy()
+
 
 if __name__ == "__main__":
     app = GridSerialApp()

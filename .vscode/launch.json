@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run TestBoard",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/testBoard_script.py",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        }
+    ]
+}
