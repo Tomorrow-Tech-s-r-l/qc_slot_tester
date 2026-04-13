@@ -1,6 +1,6 @@
-# TestBoard
+# QC Slot Tester
 
-A hardware testing platform for controlling LEDs and a lock mechanism via an Arduino board, using a Python GUI application over a serial (USB) connection.
+Quality Control tool for testing station hardware — LED boards and solenoids — via an Arduino board controlled through a Python GUI over a serial (USB) connection.
 
 ---
 

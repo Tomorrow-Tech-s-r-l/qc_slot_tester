@@ -19,28 +19,26 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Create and activate venv, install dependencies
+      - name: Install dependencies
         run: |
           python -m venv .venv
-          source .venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt pyinstaller
 
       - name: Build macOS app
         run: |
-          source .venv/bin/activate
-          pyinstaller --onefile --windowed \
+          .venv/bin/pyinstaller --onefile --windowed \
             --collect-all customtkinter \
             --distpath build \
             --workpath /tmp/pyinstaller-build \
-            --name TestBoard \
-            testBoard_script.py
+            --name QCSlotTester \
+            app.py
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TestBoard-macOS
-          path: build/TestBoard.app
+          name: QCSlotTester-macOS
+          path: build/QCSlotTester.app
 
   # ── Windows executable ────────────────────────────────────────────────────
   build-windows:
@@ -53,28 +51,26 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Create and activate venv, install dependencies
+      - name: Install dependencies
         run: |
           python -m venv .venv
-          .venv\Scripts\activate
-          pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
+          .venv\Scripts\pip.exe install --upgrade pip
+          .venv\Scripts\pip.exe install -r requirements.txt pyinstaller
 
       - name: Build Windows executable
         run: |
-          .venv\Scripts\activate
-          pyinstaller --onefile --windowed `
+          .venv\Scripts\pyinstaller.exe --onefile --windowed `
             --collect-all customtkinter `
             --distpath build `
             --workpath C:\Temp\pyinstaller-build `
-            --name TestBoard `
-            testBoard_script.py
+            --name QCSlotTester `
+            app.py
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TestBoard-Windows
-          path: build/TestBoard.exe
+          name: QCSlotTester-Windows
+          path: build/QCSlotTester.exe
 
   # ── Arduino sketch verification ───────────────────────────────────────────
   verify-arduino:
@@ -91,7 +87,4 @@ jobs:
           arduino-cli core install arduino:avr
 
       - name: Compile sketch
-        run: |
-          mkdir -p /tmp/sketch/testBoard_arduino_code
-          cp testBoard_arduino_code.ino /tmp/sketch/testBoard_arduino_code/
-          arduino-cli compile --fqbn arduino:avr:uno /tmp/sketch/testBoard_arduino_code
+        run: arduino-cli compile --fqbn arduino:avr:uno firmware

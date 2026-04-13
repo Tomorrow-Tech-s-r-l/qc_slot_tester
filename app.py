@@ -14,11 +14,11 @@ _RED         = "#e74c3c"
 _RED_HOVER   = "#c0392b"
 
 
-class GridSerialApp(ctk.CTk):
+class QCSlotTester(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("TestBoard")
+        self.title("QC Slot Tester")
         self.geometry("480x580")
         self.resizable(False, False)
 
@@ -33,9 +33,9 @@ class GridSerialApp(ctk.CTk):
         header.grid(row=0, column=0, pady=(20, 8), sticky="ew")
         header.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(header, text="TestBoard",
+        ctk.CTkLabel(header, text="QC Slot Tester",
                      font=("Arial", 28, "bold")).grid(row=0, column=0)
-        ctk.CTkLabel(header, text="Hardware Control Interface",
+        ctk.CTkLabel(header, text="Quality Control — Station Hardware",
                      font=("Arial", 13), text_color="gray").grid(row=1, column=0)
 
         # ── LED Control ──────────────────────────────────────────────────────
@@ -234,5 +234,5 @@ class GridSerialApp(ctk.CTk):
 
 
 if __name__ == "__main__":
-    app = GridSerialApp()
+    app = QCSlotTester()
     app.mainloop()

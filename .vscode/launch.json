@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run TestBoard",
+            "name": "Run QC Slot Tester",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/testBoard_script.py",
+            "program": "${workspaceFolder}/app.py",
             "python": "${workspaceFolder}/.venv/bin/python",
             "console": "integratedTerminal",
             "justMyCode": true
